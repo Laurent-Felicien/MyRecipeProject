@@ -1,0 +1,72 @@
+# Dépendances
+node_modules/
+.npm
+.pnp
+.pnp.js
+
+# Build
+/build/
+/public/build/
+/.cache/
+dist/
+
+# Environnement — ne jamais committer
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Prisma
+/prisma/*.db
+/prisma/*.db-journal
+
+# Documentation interne — architecture, modélisation, notes privées
+/docs/
+*.local.md
+
+# Tests
+/coverage/
+/.nyc_output/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V8
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+
+# Vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+*.tgz
+.eslintcache

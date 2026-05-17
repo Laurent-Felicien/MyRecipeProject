@@ -1,0 +1,330 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+// DOMAINE A — UTILISATEUR
+model User {
+  id               BigInt    @id @default(autoincrement())
+  name             String    @db.VarChar(255)
+  email            String    @unique @db.VarChar(255)
+  passwordHash     String    @map("password_hash") @db.VarChar(255)
+  emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz()
+  role             String    @default("user") @db.VarChar(50)
+  avatarUrl        String?   @map("avatar_url")
+  bio              String?
+  chefPresentation String?   @map("chef_presentation")
+  chefSpecialty    String?   @map("chef_specialty") @db.VarChar(50)
+  chefSlug         String?   @unique @map("chef_slug") @db.VarChar(255)
+  bannedAt         DateTime? @map("banned_at") @db.Timestamptz()
+  banReason        String?   @map("ban_reason")
+  countryCode      String    @map("country_code") @db.Char(2)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz()
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  country          Country   @relation(fields: [countryCode], references: [code])
+  recipes          Recipe[]
+  likes            Like[]
+  comments         Comment[]
+  recipeViews      RecipeView[]
+  recipeEdits      RecipeEdit[]
+  commentEdits     CommentEdit[]
+  reports          Report[]
+  // FK inverses pour deleted_by
+  recipesDeletedByUser  Recipe[]  @relation("RecipeDeletedByUser")
+  commentsDeletedByUser Comment[] @relation("CommentDeletedByUser")
+
+  @@index([countryCode])
+  @@index([role])
+  @@index([bannedAt])
+  @@map("users")
+}
+
+model Admin {
+  id              BigInt    @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  email           String    @unique @db.VarChar(255)
+  passwordHash    String    @map("password_hash") @db.VarChar(255)
+  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  moderationActions ModerationAction[]
+  // FK inverses pour deleted_by
+  recipesDeletedByAdmin  Recipe[]  @relation("RecipeDeletedByAdmin")
+  commentsDeletedByAdmin Comment[] @relation("CommentDeletedByAdmin")
+
+  @@map("admins")
+}
+
+model Country {
+  code      String @id @db.Char(2)
+  nameFr    String @map("name_fr") @db.VarChar(255)
+  nameEn    String @map("name_en") @db.VarChar(255)
+  emojiFlag String? @map("emoji_flag") @db.VarChar(10)
+
+  users   User[]
+  recipes Recipe[]
+
+  @@map("countries")
+}
+// DOMAINE B — CONTENU
+model Recipe {
+  id              BigInt    @id @default(autoincrement())
+  userId          BigInt    @map("user_id")
+  title           String    @db.VarChar(255)
+  slug            String    @unique @db.VarChar(255)
+  description     String?
+  countryCode     String    @map("country_code") @db.Char(2)
+  category        String    @db.VarChar(50)
+  difficulty      String    @db.VarChar(50)
+  coverImageUrl   String    @map("cover_image_url")
+  videoUrl        String?   @map("video_url")
+  prepTimeMinutes Int       @map("prep_time_minutes")
+  cookTimeMinutes Int       @map("cook_time_minutes")
+  servings        Int
+  publishedAt     DateTime? @map("published_at") @db.Timestamptz()
+  likesCount      Int       @default(0) @map("likes_count")
+  commentsCount   Int       @default(0) @map("comments_count")
+  viewsCount      Int       @default(0) @map("views_count")
+  editCount       Int       @default(0) @map("edit_count")
+  lastEditedAt    DateTime? @map("last_edited_at") @db.Timestamptz()
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz()
+  deletionReason  String?   @map("deletion_reason") @db.VarChar(50)
+  deletedByUserId  BigInt?  @map("deleted_by_user_id")
+  deletedByAdminId BigInt?  @map("deleted_by_admin_id")
+  // FTS — colonne gérée par trigger SQL, invisible côté Prisma
+  // search_text TSVECTOR — voir migration brute section 7
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  country         Country   @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  deletedByUser   User?     @relation("RecipeDeletedByUser", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  deletedByAdmin  Admin?    @relation("RecipeDeletedByAdmin", fields: [deletedByAdminId], references: [id], onDelete: SetNull)
+  ingredients     Ingredient[]
+  steps           Step[]
+  images          RecipeImage[]
+  likes           Like[]
+  comments        Comment[]
+  views           RecipeView[]
+  edits           RecipeEdit[]
+
+  @@index([userId])
+  @@index([countryCode])
+  @@index([category])
+  @@index([publishedAt(sort: Desc)])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+  @@map("recipes")
+}
+
+model Ingredient {
+  id           BigInt  @id @default(autoincrement())
+  recipeId     BigInt  @map("recipe_id")
+  name         String  @db.VarChar(255)
+  quantity     Decimal @db.Decimal(10, 2)
+  unitCode     String  @map("unit_code") @db.Char(10)
+  displayOrder Int     @map("display_order") @db.SmallInt
+
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  recipe       Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  unit         Unit     @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+
+  @@index([recipeId])
+  @@index([recipeId, displayOrder])
+  @@map("ingredients")
+}
+
+model Step {
+  id        BigInt @id @default(autoincrement())
+  recipeId  BigInt @map("recipe_id")
+  stepOrder Int    @map("step_order") @db.SmallInt
+  content   String
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, stepOrder])
+  @@index([recipeId])
+  @@index([recipeId, stepOrder])
+  @@map("steps")
+}
+
+model RecipeImage {
+  id           BigInt @id @default(autoincrement())
+  recipeId     BigInt @map("recipe_id")
+  imageUrl     String @map("image_url")
+  displayOrder Int    @map("display_order") @db.SmallInt
+
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  recipe       Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, displayOrder])
+  @@index([recipeId])
+  @@map("recipe_images")
+}
+
+model Unit {
+  code         String @id @db.Char(10)
+  labelFr      String @map("label_fr") @db.VarChar(255)
+  labelShortFr String @map("label_short_fr") @db.VarChar(50)
+  category     String @db.VarChar(50)
+
+  ingredients  Ingredient[]
+
+  @@map("units")
+}
+
+model RecipeEdit {
+  id             BigInt   @id @default(autoincrement())
+  recipeId       BigInt   @map("recipe_id")
+  editedByUserId BigInt   @map("edited_by_user_id")
+  changesSummary Json     @map("changes_summary") @db.JsonB
+  editedAt       DateTime @map("edited_at") @db.Timestamptz()
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  recipe         Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  editedBy       User     @relation(fields: [editedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipeId])
+  @@index([editedByUserId])
+  @@index([recipeId, editedAt(sort: Desc)])
+  @@map("recipe_edits")
+}
+// DOMAINE C — ENGAGEMENT
+model Like {
+  id       BigInt   @id @default(autoincrement())
+  userId   BigInt   @map("user_id")
+  recipeId BigInt   @map("recipe_id")
+  likedAt  DateTime @default(now()) @map("liked_at") @db.Timestamptz()
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recipeId], name: "uq_likes_user_recipe")
+  @@index([recipeId])
+  @@index([userId])
+  @@map("likes")
+}
+
+model Comment {
+  id              BigInt    @id @default(autoincrement())
+  userId          BigInt    @map("user_id")
+  recipeId        BigInt    @map("recipe_id")
+  parentCommentId BigInt?   @map("parent_comment_id")
+  content         String
+  repliesCount    Int       @default(0) @map("replies_count")
+  editCount       Int       @default(0) @map("edit_count")
+  lastEditedAt    DateTime? @map("last_edited_at") @db.Timestamptz()
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz()
+  deletionReason  String?   @map("deletion_reason") @db.VarChar(50)
+  deletedByUserId  BigInt?  @map("deleted_by_user_id")
+  deletedByAdminId BigInt?  @map("deleted_by_admin_id")
+  // FTS — search_text TSVECTOR — voir migration brute section 7
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recipe          Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  parent          Comment?  @relation("CommentThread", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         Comment[] @relation("CommentThread")
+  deletedByUser   User?     @relation("CommentDeletedByUser", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  deletedByAdmin  Admin?    @relation("CommentDeletedByAdmin", fields: [deletedByAdminId], references: [id], onDelete: SetNull)
+  edits           CommentEdit[]
+
+  @@index([recipeId])
+  @@index([userId])
+  @@index([parentCommentId])
+  @@index([deletedAt])
+  @@index([recipeId, parentCommentId, deletedAt])
+  @@map("comments")
+}
+
+model RecipeView {
+  id       BigInt   @id @default(autoincrement())
+  userId   BigInt   @map("user_id")
+  recipeId BigInt   @map("recipe_id")
+  viewedAt DateTime @default(now()) @map("viewed_at") @db.Timestamptz()
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recipeId], name: "uq_recipe_views_user_recipe")
+  @@index([recipeId])
+  @@index([userId])
+  @@map("recipe_views")
+}
+
+model CommentEdit {
+  id             BigInt   @id @default(autoincrement())
+  commentId      BigInt   @map("comment_id")
+  editedByUserId BigInt   @map("edited_by_user_id")
+  changesSummary Json     @map("changes_summary") @db.JsonB
+  editedAt       DateTime @map("edited_at") @db.Timestamptz()
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  comment        Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  editedBy       User     @relation(fields: [editedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([commentId])
+  @@index([commentId, editedAt(sort: Desc)])
+  @@map("comment_edits")
+}
+// DOMAINE D — MODÉRATION
+model Report {
+  id                 BigInt    @id @default(autoincrement())
+  reportedByUserId   BigInt    @map("reported_by_user_id")
+  reportableType     String    @map("reportable_type") @db.VarChar(50)
+  reportableId       BigInt    @map("reportable_id")
+  reason             String    @db.VarChar(50)
+  customReason       String?   @map("custom_reason")
+  status             String    @default("pending") @db.VarChar(50)
+  resolvedByActionId BigInt?   @map("resolved_by_action_id")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  reporter           User      @relation(fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  resolvedByAction   ModerationAction? @relation(fields: [resolvedByActionId], references: [id], onDelete: Restrict)
+  // Pas de relation Prisma pour reportable (polymorphe)
+  // Résolu via helper function côté applicatif
+
+  @@index([reportedByUserId])
+  @@index([reportableType, reportableId])
+  @@index([status])
+  @@index([resolvedByActionId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("reports")
+}
+
+model ModerationAction {
+  id                  BigInt   @id @default(autoincrement())
+  performedByAdminId  BigInt   @map("performed_by_admin_id")
+  actionType          String   @map("action_type") @db.VarChar(50)
+  reason              String
+  targetableType      String?  @map("targetable_type") @db.VarChar(50)
+  targetableId        BigInt?  @map("targetable_id")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  admin               Admin    @relation(fields: [performedByAdminId], references: [id], onDelete: Restrict)
+  resolvedReports     Report[]
+  // Pas de relation Prisma pour targetable (polymorphe)
+
+  @@index([performedByAdminId])
+  @@index([targetableType, targetableId])
+  @@index([actionType])
+  @@index([createdAt(sort: Desc)])
+  @@map("moderation_actions")
+}
