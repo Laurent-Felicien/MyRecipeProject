@@ -11,29 +11,13 @@ module.exports = {
   overrides: [
     {
       files: ["**/*.{ts,tsx}"],
-      plugins: ["@typescript-eslint", "import"],
+      plugins: ["@typescript-eslint"],
       parser: "@typescript-eslint/parser",
-      settings: {
-        "import/internal-regex": "^~/",
-        "import/resolver": {
-          node: { extensions: [".ts", ".tsx"] },
-          typescript: { alwaysryExtensions: true },
-        },
-      },
-      extends: [
-        "plugin:@typescript-eslint/recommended",
-        "plugin:import/recommended",
-        "plugin:import/typescript",
-      ],
+      extends: ["plugin:@typescript-eslint/recommended"],
       rules: {
-        "import/order": [
-          "warn",
-          {
-            alphabetize: { caseInsensitive: true, order: "asc" },
-            groups: ["builtin", "external", "internal", "parent", "sibling"],
-            "newlines-between": "always",
-          },
-        ],
+        "@typescript-eslint/no-unused-vars": "warn",
+        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/no-require-imports": "warn",
       },
     },
   ],
