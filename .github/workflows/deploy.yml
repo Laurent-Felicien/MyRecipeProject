@@ -50,3 +50,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma migrate deploy
+      - name: Setup FTS
+        run: psql "$DATABASE_URL" -f scripts/setup-fts.sql
