@@ -50,3 +50,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma migrate deploy
+      - name: Setup FTS
+        run: |
+          npm install -g pg
+          node -e "
+          const { Client } = require('pg');
+          const fs = require('fs');
+          const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+          client.connect()
+            .then(() => client.query(fs.readFileSync('scripts/setup-fts.sql', 'utf8')))
+            .then(() => { console.log('FTS setup done'); client.end(); })
+            .catch(e => { console.error(e); client.end(); process.exit(1); });
+          "
